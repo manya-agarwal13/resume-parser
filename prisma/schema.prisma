@@ -22,18 +22,24 @@ model Resume {
   mimeType  String
   rawText   String
   pageCount Int
+  fileHash  String   @unique
   profile   Profile?
   createdAt DateTime @default(now())
 }
 
 model Profile {
   id             String   @id @default(uuid())
+  resumeId       String   @unique
+  resume         Resume   @relation(fields: [resumeId], references: [id])
+
   skills         String[]
   experience     Json
   education      String[]
   certifications String[]
-  resumeId       String   @unique
-  resume         Resume   @relation(fields: [resumeId], references: [id])
+  email         String?
+  phone         String?
+
+  createdAt     DateTime @default(now())
 }
 
 model Job {
