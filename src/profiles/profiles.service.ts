@@ -1,27 +1,32 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
+type Experience = {
+  role: string;
+  years: number;
+};
+
 @Injectable()
 export class ProfilesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // 🔹 Extract Email
+  /* ----------------------------- EMAIL ----------------------------- */
   private extractEmail(text: string): string | null {
     const match = text.match(
       /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-z]{2,}/,
     );
-    return match ? match[0] : null;
+    return match ? match[0].trim() : null;
   }
 
-  // 🔹 Extract Phone
+  /* ----------------------------- PHONE ----------------------------- */
   private extractPhone(text: string): string | null {
     const match = text.match(
       /(\+?\d{1,3}[-.\s]?)?\d{10}/,
     );
-    return match ? match[0] : null;
+    return match ? match[0].trim() : null;
   }
 
-  // 🔹 Extract Skills
+  /* ----------------------------- SKILLS ----------------------------- */
   private extractSkills(text: string): string[] {
     const skillsList = [
       'Java',
@@ -37,31 +42,49 @@ export class ProfilesService {
       'NestJS',
     ];
 
-    return skillsList.filter(skill =>
-      text.toLowerCase().includes(skill.toLowerCase()),
+    const lowerText = text.toLowerCase();
+
+    const detected = skillsList.filter(skill =>
+      lowerText.includes(skill.toLowerCase()),
     );
+
+    return [...new Set(detected)];
   }
 
-  // 🔹 Extract Education
+  /* ----------------------------- EDUCATION ----------------------------- */
   private extractEducation(text: string): string[] {
-    const degrees = ['B.Tech', 'M.Tech', 'BSc', 'MSc', 'MBA', 'PhD'];
-    return degrees.filter(degree =>
-      text.includes(degree),
+    const degrees = [
+      'B.Tech',
+      'M.Tech',
+      'BSc',
+      'MSc',
+      'MBA',
+      'PhD',
+    ];
+
+    const detected = degrees.filter(degree =>
+      text.toLowerCase().includes(degree.toLowerCase()),
     );
+
+    return [...new Set(detected)];
   }
 
-  // 🔹 Extract Experience
-  private extractExperience(text: string) {
+  /* ----------------------------- EXPERIENCE ----------------------------- */
+  private extractExperience(text: string): Experience[] {
     const match = text.match(/(\d+)\+?\s*years?/i);
-    return match
-      ? [{ role: 'Unknown', years: parseInt(match[1], 10) }]
-      : [];
+
+    if (!match) return [];
+
+    return [
+      {
+        role: 'Unknown',
+        years: parseInt(match[1], 10),
+      },
+    ];
   }
 
-  // 🔹 Extract Certifications
+  /* ----------------------------- CERTIFICATIONS ----------------------------- */
   private extractCertifications(text: string): string[] {
-    const certifications: string[] = [];
-
     const certificationKeywords = [
       'Certified',
       'Certification',
@@ -79,32 +102,37 @@ export class ProfilesService {
     ];
 
     const lines = text.split('\n');
+    const certifications: string[] = [];
 
-    lines.forEach(line => {
-      certificationKeywords.forEach(keyword => {
-        if (line.toLowerCase().includes(keyword.toLowerCase())) {
+    for (const line of lines) {
+      const lowerLine = line.toLowerCase();
+
+      for (const keyword of certificationKeywords) {
+        if (lowerLine.includes(keyword.toLowerCase())) {
           certifications.push(line.trim());
+          break;
         }
-      });
-    });
+      }
+    }
 
-    // Remove duplicates
     return [...new Set(certifications)];
   }
 
-  // 🔹 Main Extract Function
+  /* ----------------------------- MAIN EXTRACTOR ----------------------------- */
   extractProfile(text: string) {
+    const cleanText = text.replace(/\s+/g, ' ').trim();
+
     return {
-      email: this.extractEmail(text),
-      phone: this.extractPhone(text),
-      skills: this.extractSkills(text),
-      education: this.extractEducation(text),
-      certifications: this.extractCertifications(text),
-      experience: this.extractExperience(text),
+      email: this.extractEmail(cleanText),
+      phone: this.extractPhone(cleanText),
+      skills: this.extractSkills(cleanText),
+      education: this.extractEducation(cleanText),
+      certifications: this.extractCertifications(text), // use original text for line-based detection
+      experience: this.extractExperience(cleanText),
     };
   }
 
-  // 🔹 Store Profile
+  /* ----------------------------- STORE PROFILE ----------------------------- */
   async create(resumeId: string, text: string) {
     const profileData = this.extractProfile(text);
 
@@ -118,6 +146,13 @@ export class ProfilesService {
         certifications: profileData.certifications,
         experience: profileData.experience,
       },
+    });
+  }
+
+  /* ----------------------------- FETCH PROFILE ----------------------------- */
+  async findByResumeId(resumeId: string) {
+    return this.prisma.profile.findUnique({
+      where: { resumeId },
     });
   }
 }
